@@ -787,6 +787,19 @@ new IntersectionObserver(entries=>{if(entries[0].isIntersecting){runCounters();h
 const heroObs=new IntersectionObserver(()=>{});
 
 /* WEBSITE VISITOR COUNTER */
+function updateLocalVisitFallback(countEl){
+  const localKey='portfolio-local-visits';
+  try{
+    const current=Number(localStorage.getItem(localKey)||'0')+1;
+    localStorage.setItem(localKey,String(current));
+    countEl.textContent=current.toLocaleString();
+    return;
+  }catch(_storageErr){
+    // Storage can fail in strict privacy mode; show a safe numeric default.
+    countEl.textContent='1';
+  }
+}
+
 async function updateVisitCount(){
   const countEl=document.getElementById('visitCount');
   if(!countEl)return;
@@ -798,10 +811,7 @@ async function updateVisitCount(){
     countEl.textContent=Number(data.value||0).toLocaleString();
   }catch(_err){
     // Fallback: keep a browser-local count when the remote API is unavailable.
-    const localKey='portfolio-local-visits';
-    const current=Number(localStorage.getItem(localKey)||'0')+1;
-    localStorage.setItem(localKey,String(current));
-    countEl.textContent=current.toLocaleString();
+    updateLocalVisitFallback(countEl);
   }
 }
 updateVisitCount();
