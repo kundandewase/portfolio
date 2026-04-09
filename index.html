@@ -708,7 +708,7 @@ footer{padding:2rem 5%;border-top:1px solid var(--border);display:flex;align-ite
 <footer>
   <div class="ft-logo">Kundan Dewase</div>
   <div class="ft-copy">© 2025 Kundan Dewase. All rights reserved.</div>
-  <div class="ft-vis"><span class="ft-vis-live">Live</span><span class="ft-vis-label">Visits:</span> <span class="ft-vis-num" id="visitCount">...</span></div>
+  <div class="ft-vis"><span class="ft-vis-live">Live</span><span class="ft-vis-label">Total:</span> <span class="ft-vis-num" id="visitCount">...</span><span class="ft-vis-label">Today:</span> <span class="ft-vis-num" id="todayCount">...</span></div>
   <a href="#hero" class="ft-top">↑ Back to top</a>
 </footer>
  
@@ -792,31 +792,43 @@ new IntersectionObserver(entries=>{if(entries[0].isIntersecting){runCounters();h
 const heroObs=new IntersectionObserver(()=>{});
 
 /* WEBSITE VISITOR COUNTER */
-function updateLocalVisitFallback(countEl){
-  const localKey='portfolio-local-visits';
-  try{
-    const current=Number(localStorage.getItem(localKey)||'0')+1;
-    localStorage.setItem(localKey,String(current));
-    countEl.textContent=current.toLocaleString();
-    return;
-  }catch(_storageErr){
-    // Storage can fail in strict privacy mode; show a safe numeric default.
-    countEl.textContent='1';
-  }
+function parseVisitorCount(svgText){
+  const match=svgText.match(/aria-label="VISITORS:\s*([0-9,]+)"/i)||svgText.match(/<title>VISITORS:\s*([0-9,]+)<\/title>/i);
+  if(!match)return null;
+  return Number(match[1].replace(/,/g,''));
+}
+
+function getLocalDateKey(){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=String(now.getMonth()+1).padStart(2,'0');
+  const d=String(now.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
 }
 
 async function updateVisitCount(){
-  const countEl=document.getElementById('visitCount');
-  if(!countEl)return;
+  const totalEl=document.getElementById('visitCount');
+  const todayEl=document.getElementById('todayCount');
+  if(!totalEl||!todayEl)return;
+  const todayKey=getLocalDateKey();
   try{
-    // CountAPI stores a global counter keyed by namespace + key.
-    const res=await fetch('https://api.countapi.xyz/hit/kundan-dewase/portfolio-visits');
-    if(!res.ok)throw new Error('counter request failed');
-    const data=await res.json();
-    countEl.textContent=Number(data.value||0).toLocaleString();
+    // Each endpoint increments and returns a shared global counter value.
+    const [totalRes,todayRes]=await Promise.all([
+      fetch('https://api.visitorbadge.io/api/visitors?path=kundan-dewase-portfolio-total'),
+      fetch(`https://api.visitorbadge.io/api/visitors?path=kundan-dewase-portfolio-${todayKey}`)
+    ]);
+    if(!totalRes.ok||!todayRes.ok)throw new Error('counter request failed');
+
+    const [totalSvg,todaySvg]=await Promise.all([totalRes.text(),todayRes.text()]);
+    const totalCount=parseVisitorCount(totalSvg);
+    const todayCount=parseVisitorCount(todaySvg);
+    if(totalCount===null||todayCount===null)throw new Error('counter parse failed');
+
+    totalEl.textContent=totalCount.toLocaleString();
+    todayEl.textContent=todayCount.toLocaleString();
   }catch(_err){
-    // Fallback: keep a browser-local count when the remote API is unavailable.
-    updateLocalVisitFallback(countEl);
+    totalEl.textContent='--';
+    todayEl.textContent='--';
   }
 }
 updateVisitCount();
